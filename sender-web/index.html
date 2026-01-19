@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drop - Send Files</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Drop</h1>
+            <p class="tagline">Send files to nearby devices</p>
+        </header>
+
+        <!-- Step 1: Select Files -->
+        <section id="step-files" class="step active">
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" multiple hidden>
+                <div class="drop-zone-content">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    <p>Drop files here or <button id="browseBtn" class="link-btn">browse</button></p>
+                </div>
+            </div>
+
+            <div id="selectedFiles" class="file-list hidden">
+                <h3>Selected Files</h3>
+                <ul id="fileListItems"></ul>
+                <div class="file-summary">
+                    <span id="fileSummary"></span>
+                    <button id="clearFiles" class="btn-secondary">Clear</button>
+                </div>
+            </div>
+
+            <button id="nextBtn" class="btn-primary hidden" disabled>
+                Find Nearby Devices
+            </button>
+        </section>
+
+        <!-- Step 2: Find Devices -->
+        <section id="step-devices" class="step">
+            <button id="backToFiles" class="btn-back">&larr; Back</button>
+
+            <div id="scanStatus" class="scan-status">
+                <div class="spinner"></div>
+                <p>Scanning for nearby devices...</p>
+            </div>
+
+            <div id="deviceList" class="device-list hidden">
+                <h3>Nearby Devices</h3>
+                <ul id="deviceListItems"></ul>
+            </div>
+
+            <div id="noDevices" class="no-devices hidden">
+                <p>No devices found</p>
+                <button id="rescanBtn" class="btn-secondary">Scan Again</button>
+            </div>
+        </section>
+
+        <!-- Step 3: Transfer -->
+        <section id="step-transfer" class="step">
+            <div id="transferStatus" class="transfer-status">
+                <div class="transfer-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13"/>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+                    </svg>
+                </div>
+                <h3 id="transferTitle">Sending request...</h3>
+                <p id="transferSubtitle">Waiting for <span id="receiverName">device</span> to accept</p>
+
+                <div id="progressContainer" class="progress-container hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-text"><span id="progressPercent">0</span>% &middot; <span id="progressSpeed">--</span></p>
+                </div>
+
+                <div id="transferComplete" class="transfer-complete hidden">
+                    <svg class="checkmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 6L9 17L4 12"/>
+                    </svg>
+                    <p>Transfer complete!</p>
+                </div>
+
+                <div id="transferError" class="transfer-error hidden">
+                    <p id="errorMessage">Transfer failed</p>
+                    <button id="retryBtn" class="btn-secondary">Try Again</button>
+                </div>
+            </div>
+
+            <button id="cancelTransfer" class="btn-secondary">Cancel</button>
+        </section>
+
+        <!-- Bluetooth Not Supported -->
+        <section id="step-unsupported" class="step">
+            <div class="unsupported">
+                <svg class="icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <h2>Web Bluetooth Not Supported</h2>
+                <p>Your browser doesn't support Web Bluetooth API.</p>
+                <p class="hint">Try using Chrome, Edge, or Opera on desktop.</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

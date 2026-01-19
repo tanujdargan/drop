@@ -1,133 +1,184 @@
-# Drop - A Cross-Platform File Sharing Experiment
+# Drop - Cross-Platform File Sharing
 
-## Overview
+Send files to nearby devices. No app needed on sender side.
 
-Drop aims to be a seamless file-sharing solution across any platform, inspired by Apple's AirDrop. It leverages web technologies for the transfer and aims to use NFC and/or BLE for connection initiation without requiring a dedicated app installation on the receiving end (potentially using the Web Bluetooth/Web NFC APIs where available or platform-specific OS integrations).
+## How It Works
 
-The core idea is to make file sharing quick and easy, without needing to be on the same Wi-Fi network or relying on one device to host a hotspot. File transfers are intended to occur over a direct peer-to-peer Wi-Fi connection (e.g., Wi-Fi Direct or WebRTC over local network) or relayed if a direct connection isn't possible.
-
-**Current Status:**
-*   **Frontend:** Basic Next.js application setup in the `/frontend` directory.
-*   **Backend:** Rust-based backend (`drop_backend`) using Actix Web.
-    *   Serves as a signaling server for WebRTC.
-    *   API endpoints for creating transfer sessions and exchanging signaling messages.
-*   **File Transfer:** Signaling mechanism is in place. Actual WebRTC data channel for file transfer is the next major step.
-*   **Discovery (NFC/BLE):** Not yet implemented.
+1. **Sender** opens a lightweight web page on their device (any browser with Web Bluetooth)
+2. **Sender** selects files and sees nearby Drop receivers
+3. **Receiver** gets a notification and accepts the transfer
+4. Files transfer over WiFi (fast) after BLE handshake (discovery)
 
 ## Project Structure
 
 ```
 drop/
-├── frontend/         # Next.js frontend application
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── ...
-├── src/              # Rust backend (drop_backend) library and binary
-│   ├── ble.rs        # Placeholder/WIP for Bluetooth LE
-│   ├── crypto.rs     # Placeholder/WIP for cryptographic operations
-│   ├── error.rs      # Custom error types
-│   ├── lib.rs        # Backend library code (includes signaling server logic)
-│   ├── main.rs       # Backend binary entry point
-│   ├── protocol.rs   # Placeholder/WIP for transfer protocol definitions
-│   ├── transfer.rs   # Placeholder/WIP for file transfer logic
-│   └── webrtc.rs     # Placeholder/WIP for WebRTC integration
-├── .gitignore
-├── Cargo.lock
-├── Cargo.toml        # Rust backend dependencies and configuration
-└── README.md         # This file
+├── sender-web/              # Lightweight web sender (~50KB)
+│   ├── index.html
+│   ├── app.js              # Web Bluetooth + file upload logic
+│   └── style.css
+│
+├── receiver-android/        # Android receiver app
+│   └── app/
+│       └── src/main/java/dev/drop/receiver/
+│           ├── ble/        # BLE GATT server
+│           ├── http/       # HTTP file receive server
+│           └── ui/         # Main activity
+│
+├── receiver-core/           # Rust receiver library (for desktop)
+│   └── src/
+│       ├── lib.rs          # Main library
+│       ├── protocol.rs     # Drop protocol definitions
+│       ├── ble.rs          # BLE peripheral logic
+│       ├── http_server.rs  # HTTP file receive server
+│       └── storage.rs      # File storage management
+│
+├── src/                     # Legacy signaling server (optional)
+└── frontend/                # Legacy Next.js frontend (deprecated)
 ```
 
-## Prerequisites
+## Quick Start
 
-*   [Node.js and npm](https://nodejs.org/) (for the frontend)
-*   [Rust and Cargo](https://www.rust-lang.org/tools/install) (for the backend)
+### Testing: Windows Browser → Android
 
-## Setup and Running
+**Prerequisites:**
+- Windows PC with Bluetooth and Chrome/Edge browser
+- Android device (tablet/phone) with Bluetooth
 
-### Backend (Rust - `drop_backend`)
+**Step 1: Build and Install Android Receiver**
 
-1.  **Navigate to the project root:**
-    ```bash
-    cd /path/to/your/drop
-    ```
+```bash
+cd receiver-android
+./gradlew assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
 
-2.  **Build the backend:**
-    ```bash
-    cargo build
-    ```
+**Step 2: Start Android Receiver**
 
-3.  **Run the backend server:**
-    ```bash
-    cargo run
-    ```
-    The server will start on `http://127.0.0.1:8080` by default. You should see output like:
-    ```
-    Initializing drop_backend...
-    Starting Actix web server on http://127.0.0.1:8080
-    ```
+1. Open the "Drop" app on your Android device
+2. Grant Bluetooth and notification permissions
+3. Tap "Start Receiver" - you'll see "Ready to receive files"
+4. Note the IP address shown
 
-4.  **Run backend tests:**
-    ```bash
-    cargo test
-    ```
+**Step 3: Open Web Sender**
 
-### Frontend (Next.js)
+1. On Windows, open Chrome/Edge
+2. Navigate to `sender-web/index.html` (or serve it locally)
+3. Select files to send
+4. Click "Find Nearby Devices"
+5. Browser will show Bluetooth device picker - select your Android device
+6. Wait for receiver to accept
+7. Files transfer over WiFi
 
-1.  **Navigate to the frontend directory:**
-    ```bash
-    cd /path/to/your/drop/frontend # Replace with the actual path
-    ```
+### Serving the Web Sender
 
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
+For local testing, you can use any simple HTTP server:
 
-3.  **Run the development server:**
-    ```bash
-    npm run dev
-    ```
-    The Next.js frontend will typically start on `http://localhost:3000`.
+```bash
+# Python
+cd sender-web && python -m http.server 8000
 
-## Core Components & Logic
+# Node.js (npx)
+cd sender-web && npx serve
 
-### 1. Backend Signaling Server (Rust/Actix Web)
+# Then open http://localhost:8000 in Chrome/Edge
+```
 
-*   Located in `drop/src/lib.rs` and `drop/src/main.rs`.
-*   Provides API endpoints for WebRTC signaling:
-    *   `POST /api/session/create`: Initiates a new sharing session and returns a unique `session_id`.
-    *   `POST /api/session/{session_id}/signal/send`: Allows a client to send a signaling message (SDP offer/answer, ICE candidate) to the other peer in the session.
-    *   `GET /api/session/{session_id}/signal/receive`: Allows a client to poll for signaling messages from the other peer.
-*   Uses an in-memory store (`DashMap`) for session messages (this would be replaced by a more robust solution like Redis in a production environment).
+**Note:** Web Bluetooth requires HTTPS in production, but works on localhost for testing.
 
-### 2. Frontend (Next.js)
+## Protocol Overview
 
-*   Located in `drop/frontend`.
-*   Will handle:
-    *   User interface for initiating and receiving files.
-    *   WebRTC connection establishment using the backend signaling server.
-    *   Actual file transfer via WebRTC `RTCDataChannel`.
-    *   Potentially, interaction with Web Bluetooth/Web NFC APIs for discovery.
+### BLE Service
 
-### 3. File Transfer (WebRTC)
+```
+Service UUID: 0000fe50-0000-1000-8000-00805f9b34fb
 
-The file transfer itself is envisioned to happen directly between peers using WebRTC data channels. The Rust backend's role is primarily to facilitate the initial WebRTC handshake (signaling).
+Characteristics:
+├── Device Info (Read)      - 0000fe51-...
+├── Transfer Request (Write) - 0000fe52-...
+├── Transfer Response (Notify) - 0000fe53-...
+└── Transfer Status (Write/Notify) - 0000fe54-...
+```
 
-### 4. Discovery (NFC/BLE - Future)
+### Transfer Flow
 
-The idea is to use NFC taps or BLE advertisements to initiate a connection.
-*   **Sender:** Taps phone or brings device close to receiver.
-*   **Receiver:** (If no app) A browser could potentially be opened via an NFC NDEF record or a Physical Web BLE beacon, pointing to a URL on the Drop web app, perhaps with the session ID or sender's identifier embedded.
-*   The exact mechanism will require careful design and will depend on OS capabilities and browser support for Web NFC / Web Bluetooth.
+```
+Sender (Browser)                    Receiver (Android)
+     │                                     │
+     │◀──── BLE Advertisement ─────────────│ (Drop service)
+     │                                     │
+     │─── BLE Connect + Write Request ────▶│
+     │    {files: [...], totalSize: 5MB}   │
+     │                              [Notification shown]
+     │                              [User taps Accept]
+     │◀─── BLE Notify: Accept ─────────────│
+     │     {ip: "192.168.1.50", port: 53317}
+     │                                     │
+     │════ HTTP POST /upload (WiFi) ══════▶│
+     │     [File data via multipart form]  │
+     │                                     │
+     │◀═══ HTTP 200 OK ════════════════════│
+     │                              [File saved]
+```
 
-## Future Development
+## Supported Platforms
 
-*   Implement WebRTC client logic in the Next.js frontend for peer connection and data channel setup.
-*   Develop the file selection and transfer UI.
-*   Integrate actual file sending/receiving over `RTCDataChannel`.
-*   Design and implement the NFC/BLE discovery and handshake mechanism.
-*   Explore platform-specific integrations if web-based discovery is insufficient.
-*   Add more robust error handling and user feedback.
-*   Secure the signaling channel and consider end-to-end encryption for file transfers.
-*   Refine the UI/UX for a simple and intuitive experience.
+### Sender (Web App)
+- ✅ Chrome (Windows, macOS, Linux, Android)
+- ✅ Edge (Windows)
+- ✅ Opera
+- ❌ Firefox (no Web Bluetooth)
+- ❌ Safari (limited Web Bluetooth)
+
+### Receiver
+- ✅ Android 8.0+ (BLE peripheral + HTTP server)
+- 🚧 Windows (Rust + btleplug) - in development
+- 🚧 macOS (Swift + CoreBluetooth) - planned
+- 🚧 iOS (Swift + CoreBluetooth) - planned
+- 🚧 Linux (Rust + BlueZ) - planned
+
+## Development
+
+### Android Receiver
+
+```bash
+cd receiver-android
+./gradlew build
+```
+
+### Rust Receiver Core (Desktop)
+
+```bash
+cd receiver-core
+cargo build
+cargo test
+```
+
+### Web Sender
+
+No build step required - pure vanilla JS. Just serve the files.
+
+## Architecture Decisions
+
+1. **BLE for Discovery, WiFi for Transfer**
+   - BLE: ~200 Kbps - 1 Mbps real-world (too slow for files)
+   - WiFi: 50-500+ Mbps (fast enough for any file size)
+
+2. **Lightweight Web Sender**
+   - No frameworks, no build step
+   - ~50KB total (HTML + JS + CSS)
+   - Uses Web Bluetooth API for BLE scanning
+
+3. **Native Receivers**
+   - Need background BLE advertising
+   - Need local HTTP server for file receiving
+   - Minimal size (~2-3MB per platform)
+
+4. **HTTP for File Transfer**
+   - Simpler than WebRTC for local network
+   - No STUN/TURN servers needed
+   - Standard multipart form upload
+
+## License
+
+MIT
